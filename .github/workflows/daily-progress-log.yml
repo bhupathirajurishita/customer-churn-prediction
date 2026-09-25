@@ -34,6 +34,7 @@ jobs:
           const authorLogin = 'bhupathirajurishita';
           const token = process.env.GH_TOKEN;
           const apiBase = 'https://api.github.com';
+          const newline = String.fromCharCode(10);
 
           async function api(path, options = {}) {
             const response = await fetch(apiBase + path, {
@@ -47,9 +48,7 @@ jobs:
             });
             const text = await response.text();
             const data = text ? JSON.parse(text) : null;
-            if (!response.ok) {
-              throw new Error(`GitHub API ${response.status}: ${text}`);
-            }
+            if (!response.ok) throw new Error(`GitHub API ${response.status}: ${text}`);
             return data;
           }
 
@@ -77,9 +76,10 @@ jobs:
               const start = body.indexOf(`### ${heading}`);
               if (start < 0) return false;
               const contentStart = start + heading.length + 4;
-              const nextHeading = body.indexOf('\\n### ', contentStart);
+              const nextHeading = body.indexOf(newline + '### ', contentStart);
               const answer = body.slice(contentStart, nextHeading < 0 ? undefined : nextHeading).trim();
-              if (answer.length < 12 || /^(no response|n\\/?a|none|tbd|todo|\\-+)$/i.test(answer)) return false;
+              const normalized = answer.toLowerCase();
+              if (answer.length < 12 || ['no response', 'n/a', 'na', 'none', 'tbd', 'todo', '-'].includes(normalized)) return false;
             }
             return true;
           }
@@ -94,11 +94,6 @@ jobs:
           }
 
           async function archive(issue) {
-            if (!validCheckIn(issue)) {
-              console.log(`Skipping issue #${issue.number}: not a complete Daily progress check-in by the repository owner.`);
-              return;
-            }
-
             const date = localDate(issue.created_at);
             const path = `progress/${date}.md`;
             const marker = `<!-- archived-issue: ${issue.number} -->`;
@@ -135,10 +130,10 @@ jobs:
               '',
               marker,
               '',
-            ].join('\\n');
+            ].join(newline);
             const content = oldContent
-              ? `${oldContent.trimEnd()}\\n\\n${entry}`
-              : `# Progress for ${date}\\n\\n${entry}`;
+              ? `${oldContent.trimEnd()}${newline}${newline}${entry}`
+              : `# Progress for ${date}${newline}${newline}${entry}`;
 
             await api(`/repos/${owner}/${repo}/contents/${path}`, {
               method: 'PUT',
